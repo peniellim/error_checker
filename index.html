@@ -180,27 +180,27 @@
 
 <script>
 const CHECKS = [
-  { id:'gap2',    group:'timing', label:'Min 2-frame gap between subtitle end and next start', defaultOn:true },
-  { id:'mindur20',group:'timing', label:'Minimum duration of 20 frames', defaultOn:true },
-  { id:'maxdur6s', group:'timing', label:'Maximum duration of 6 seconds', defaultOn:false },
-  { id:'mindur1s', group:'timing', label:'Minimum duration of 1 second', defaultOn:false },
-  { id:'maxdur8s', group:'timing', label:'Maximum duration of 8 seconds', defaultOn:false },
-  { id:'curlya',  group:'text',   label:"Curly apostrophe ' (smart quote)", defaultOn:true },
-  { id:'hypcon',  group:'text',   label:'Hyphen consistency (both lines must start with hyphen or neither)', defaultOn:true },
-  { id:'hyp_nospace', group:'text', label:'Hyphens at start of line must NOT have a space after (- text → flag)', defaultOn:false },
-  { id:'hyp_space',   group:'text', label:'Hyphens at start of line MUST have a space after (-text → flag)', defaultOn:false },
-  { id:'multispc',group:'text',   label:'Multiple consecutive spaces', defaultOn:true },
-  { id:'emptyline',group:'text',  label:'Empty or missing dialogue', defaultOn:true },
-  { id:'leadtrail',group:'text',  label:'Line starts or ends with a space', defaultOn:true },
-  { id:'doublehyp',group:'text',  label:'Double hyphens (--)', defaultOn:true },
-  { id:'dotseq',  group:'text',   label:'Dot sequences not equal to 1 or 3 (e.g. .. or ....)', defaultOn:true },
-  { id:'comma_end',group:'text',  label:'Comma at the end of the last line', defaultOn:true },
-  { id:'char37',  group:'char',   label:'Character limit of 37 per line', defaultOn:false },
-  { id:'char42',  group:'char',   label:'Character limit of 42 per line', defaultOn:false },
-  { id:'maxlines2',group:'char',  label:'Maximum 2 lines per subtitle', defaultOn:true },
-  { id:'mergeable',group:'char',  label:'2-line subtitle can be merged into 1 (skip if starts with hyphen)', defaultOn:true },
-  { id:'rs20',    group:'rs',     label:'Reading speed over 20 cps', defaultOn:false },
-  { id:'rs30',    group:'rs',     label:'Reading speed over 30 cps', defaultOn:true },
+  { id:'gap2',    group:'timing', label:'Min 2-frame gap', defaultOn:true },
+  { id:'mindur20',group:'timing', label:'Min duration 20 frames', defaultOn:true },
+  { id:'maxdur6s', group:'timing', label:'Max duration 6 seconds', defaultOn:false },
+  { id:'mindur1s', group:'timing', label:'Min duration 1 second', defaultOn:false },
+  { id:'maxdur8s', group:'timing', label:'Max duration of 8 seconds', defaultOn:false },
+  { id:'curlya',  group:'text',   label:"Curly apostrophe", defaultOn:true },
+  { id:'hypcon',  group:'text',   label:'Hyphen for 2 speakers', defaultOn:true },
+  { id:'hyp_nospace', group:'text', label:'No spacing after hyphen', defaultOn:false },
+  { id:'hyp_space',   group:'text', label:'Spacing after hyphen', defaultOn:false },
+  { id:'multispc',group:'text',   label:'Multiple spaces', defaultOn:true },
+  { id:'emptyline',group:'text',  label:'Empty line', defaultOn:true },
+  { id:'leadtrail',group:'text',  label:'Leading/trailing space', defaultOn:true },
+  { id:'doublehyp',group:'text',  label:'Double hyphens', defaultOn:true },
+  { id:'dotseq',  group:'text',   label:'2 or 4+ dot', defaultOn:true },
+  { id:'comma_end',group:'text',  label:'End line comma', defaultOn:true },
+  { id:'char37',  group:'char',   label:'Character limit: 37', defaultOn:false },
+  { id:'char42',  group:'char',   label:'Character limit: 42', defaultOn:false },
+  { id:'maxlines2',group:'char',  label:'Maximum 2 lines', defaultOn:true },
+  { id:'mergeable',group:'char',  label:'Fit to 1 line', defaultOn:true },
+  { id:'rs20',    group:'rs',     label:'Over 20 CPS', defaultOn:false },
+  { id:'rs30',    group:'rs',     label:'Over 30 CPS', defaultOn:true },
 ];
 
 function buildCheckboxes() {
@@ -330,7 +330,7 @@ function runChecks() {
 
     // 2. Curly apostrophe
     if (isChecked('curlya') && /[\u2018\u2019\u201A\u201B]/.test(r.dialogue)) {
-      errs.push("Curly apostrophe (')"); allErrors.add("Curly apostrophe (')");
+      errs.push("Curly apostrophe"); allErrors.add("Curly apostrophe (')");
     }
 
     // 3. Hyphen consistency
