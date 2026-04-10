@@ -117,6 +117,7 @@
     </div>
   </div>
 
+ 
   <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;">
       <div class="card-title" style="margin:0;">Checks to run</div>
@@ -125,9 +126,8 @@
         <button class="toggle-all" onclick="toggleAll(false)">Deselect all</button>
       </div>
     </div>
-
-    <div class="checks-grid" id="checks-grid"></div>
-
+ 
+    <div class="checks-grid" id="checks-grid"></div> 
     <div class="controls-row">
       <button class="btn btn-primary" id="run-btn" onclick="runChecks()" disabled>Run checks</button>
       <button class="btn btn-secondary" onclick="resetAll()">Reset</button>
@@ -168,69 +168,40 @@
   </div>
 </div>
 
-<!-- Harper: full spelling + grammar, no API, privacy‑first, in browser only -->
-<script type="module">
-  import { WorkerLinter, binaryInlined } from "https://unpkg.com/harper.js@0.54.0/dist/harper.js";
-
-  const harper = new WorkerLinter({ binary: binaryInlined });
-  await harper.setup();
-
-  // Optional: keep only spelling; comment this to keep full grammar
-  await harper.setLintConfig({
-    SpellCheck: true,
-    SpelledNumbers: false,
-    AnA: false,
-    SentenceCapitalization: false,
-    UnclosedQuotes: false,
-    WrongQuotes: false,
-    LongSentences: false,
-    RepeatedWords: false,
-    Spaces: false,
-    Matcher: false,
-    CorrectNumberSuffix: false
-  });
-
-  window.runHarperCheck = async function(text) {
-    const lints = await harper.lint(text);
-    return lints.map(l => ({
-      type: l.category(),    // e.g., "SpellCheck", "RepeatedWords"
-      message: l.message()
-    }));
-  };
-</script>
-
 <script>
 const CHECKS = [
-  { id:'gap2',      label:'Min 2-frame gap', defaultOn:true },
-  { id:'mindur20',  label:'Min duration 20 frames', defaultOn:true },
-  { id:'maxdur6s',  label:'Max duration 6 seconds', defaultOn:false },
-  { id:'mindur1s',  label:'Min duration 1 second', defaultOn:false },
-  { id:'maxdur8s',  label:'Max duration of 8 seconds', defaultOn:false },
-  { id:'curlya',    label:"Curly apostrophe", defaultOn:true },
-  { id:'hypcon',    label:'Hyphen for 2 speakers', defaultOn:true },
+  { id:'gap2', label:'Min 2-frame gap', defaultOn:true },
+  { id:'mindur20', label:'Min duration 20 frames', defaultOn:true },
+  { id:'maxdur6s', label:'Max duration 6 seconds', defaultOn:false },
+  { id:'mindur1s', label:'Min duration 1 second', defaultOn:false },
+  { id:'maxdur8s', label:'Max duration of 8 seconds', defaultOn:false },
+  { id:'curlya', label:"Curly apostrophe", defaultOn:true },
+  { id:'hypcon', label:'Hyphen for 2 speakers', defaultOn:true },
   { id:'hyp_nospace', label:'No spacing after hyphen', defaultOn:false },
-  { id:'hyp_space',   label:'Spacing after hyphen', defaultOn:false },
-  { id:'multispc',  label:'Multiple spaces', defaultOn:true },
+  { id:'hyp_space', label:'Spacing after hyphen', defaultOn:false },
+  { id:'multispc', label:'Multiple spaces', defaultOn:true },
   { id:'emptyline', label:'Empty line', defaultOn:true },
   { id:'leadtrail', label:'Leading/trailing space', defaultOn:true },
   { id:'doublehyp', label:'Double hyphens', defaultOn:true },
-  { id:'dotseq',    label:'2 or 4+ dot', defaultOn:true },
+  { id:'dotseq', label:'2 or 4+ dot', defaultOn:true },
   { id:'comma_end', label:'End line comma', defaultOn:true },
-  { id:'char37',    label:'Character limit: 37', defaultOn:false },
-  { id:'char42',    label:'Character limit: 42', defaultOn:false },
+  { id:'char37', label:'Character limit: 37', defaultOn:false },
+  { id:'char42', label:'Character limit: 42', defaultOn:false },
   { id:'maxlines2', label:'Maximum 2 lines', defaultOn:true },
   { id:'mergeable', label:'Fit to 1 line', defaultOn:true },
-  { id:'rs20',      label:'Over 20 CPS', defaultOn:false },
-  { id:'rs30',      label:'Over 30 CPS', defaultOn:true },
-  { id:'spellcheck',label:'Spell & grammar (Harper)', defaultOn:false },
+  { id:'rs20', label:'Over 20 CPS', defaultOn:false },
+  { id:'rs30', label:'Over 30 CPS', defaultOn:true },
 ];
 
-// Build all checkboxes in one flat grid
 function buildCheckboxes() {
   const grid = document.getElementById('checks-grid');
   if (!grid) return;
   grid.innerHTML = '';
-  CHECKS.forEach((c, i
+  CHECKS.forEach((c, i) => {
+    const div = document.createElement('label');
+    div.className = 'check-item';
+    div.innerHTML = `<input type="checkbox" id="chk_${c.id}" ${c.defaultOn?'checked':''}><span class="check-num">${i+1}.</span><span class="check-label">${c.label}</span>`;
+    grid.appendChild(div);
   });
 }
 
@@ -238,9 +209,7 @@ function toggleAll(on) {
   CHECKS.forEach(c => { document.getElementById('chk_'+c.id).checked = on; });
 }
 
-function isChecked(id) {
-  return document.getElementById('chk_'+id).checked;
-}
+function isChecked(id) { return document.getElementById('chk_'+id).checked; }
 
 let workbook = null;
 
@@ -279,7 +248,7 @@ function getLines(text) {
   return String(text).split(/\r?\n/);
 }
 
-async function runChecks() {
+function runChecks() {
   if (!workbook) return;
   const fps = parseFloat(document.getElementById('fps-select').value);
   const sheetInput = document.getElementById('sheet-input').value.trim();
@@ -309,8 +278,7 @@ async function runChecks() {
 
   const allErrors = new Set();
 
-  for (let i = 0; i < processed.length; i++) {
-    const r = processed[i];
+  processed.forEach((r, i) => {
     const errs = r.errors;
     const lines = getLines(r.dialogue);
     const durF = (r.startF != null && r.endF != null) ? (r.endF - r.startF) : null;
@@ -349,7 +317,7 @@ async function runChecks() {
       errs.push('Empty dialogue'); allErrors.add('Empty dialogue');
     }
 
-    if (lines.length === 0) continue;
+    if (lines.length === 0) return;
 
     // 2. Curly apostrophe
     if (isChecked('curlya') && /[\u2018\u2019\u201A\u201B]/.test(r.dialogue)) {
@@ -398,6 +366,18 @@ async function runChecks() {
 
     // 13. Dot sequences not 1 or 3
     if (isChecked('dotseq')) {
+      const matches = r.dialogue.match(/\.{2,}|(?<!\.)\.(?!\.)/g);
+      if (r.dialogue.match(/\.{2,}/)) {
+        const seqs = r.dialogue.match(/\.+/g)||[];
+        const bad = seqs.filter(s => s.length !== 1 && s.length !== 3);
+        if (bad.length > 0) { errs.push(`Dot sequence: ${bad.map(b=>b).join(', ')}`); allErrors.add('Invalid dot sequence'); }
+      }
+    }
+
+    // Fix dotseq check - simpler approach
+    if (isChecked('dotseq')) {
+      const last_idx = errs.findLastIndex ? errs.findLastIndex(e=>e.startsWith('Dot sequence')) : errs.map(e=>e.startsWith('Dot')).lastIndexOf(true);
+      if (last_idx >= 0) errs.splice(last_idx,1);
       const seqs = [...r.dialogue.matchAll(/\.+/g)].map(m=>m[0]);
       const badSeqs = seqs.filter(s => s.length !== 1 && s.length !== 3);
       if (badSeqs.length > 0) { errs.push(`Dot seq not 1 or 3 (${badSeqs.join(',')})`); allErrors.add('Invalid dot sequence'); }
@@ -443,20 +423,7 @@ async function runChecks() {
       const rsv = parseFloat(r.rs);
       if (!isNaN(rsv) && rsv > 30) { errs.push(`Reading speed > 30 (${rsv})`); allErrors.add('Reading speed > 30'); }
     }
-
-    // 22. Harper: spell & grammar (no API, client‑side only)
-    if (isChecked('spellcheck')) {
-      const text = String(r.dialogue);
-      if (text && text.trim()) {
-        const issues = window.runHarperCheck ? await window.runHarperCheck(text) : [];
-        if (issues.length) {
-          errs.push(
-            ...issues.map(i => `Harper: ${i.type}: ${i.message}`)
-          );
-        }
-      }
-    }
-  }
+  });
 
   renderResults(processed, allErrors);
 }
@@ -542,3 +509,5 @@ function resetAll() {
 buildCheckboxes();
 setupDrop();
 </script>
+</body>
+</html>
