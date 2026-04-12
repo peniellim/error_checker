@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Subtitle Professional Spellchecker</title>
+  <title>Subtitle Pro Spellcheck - Final Fixed</title>
   
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/typo-js@1.2.3/typo.min.js"></script>
@@ -11,7 +11,7 @@
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 15px; line-height: 1.6; background: #f5f5f0; color: #1a1a1a; min-height: 100vh; }
-    .page { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+    .page { max-width: 1300px; margin: 0 auto; padding: 2rem; }
     .card { background: #fff; border: 0.5px solid #ddd; border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
     h1 { font-size: 22px; margin-bottom: 1rem; }
     .upload-area { border: 2px dashed #ccc; border-radius: 10px; padding: 2rem; text-align: center; cursor: pointer; background: #fafafa; transition: 0.2s; }
@@ -20,14 +20,15 @@
     .btn { padding: 0.6rem 1.4rem; border-radius: 8px; font-weight: 500; cursor: pointer; border: none; transition: 0.2s; }
     .btn-primary { background: #5c5fef; color: #fff; }
     .btn-primary:disabled { background: #ccc; cursor: not-allowed; }
-    table { width: 100%; border-collapse: collapse; margin-top: 1rem; font-size: 13px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 1rem; font-size: 13px; table-layout: fixed; }
     th { text-align: left; padding: 10px; background: #f8f8f8; border-bottom: 2px solid #eee; }
-    td { padding: 10px; border-bottom: 1px solid #eee; vertical-align: top; }
+    td { padding: 10px; border-bottom: 1px solid #eee; vertical-align: top; word-wrap: break-word; }
     .has-error { background: #fff8e1; }
     .etag { display: inline-block; padding: 2px 8px; border-radius: 4px; background: #fee2e2; color: #b91c1c; font-size: 11px; font-weight: 600; margin: 2px; border: 0.5px solid #f87171; }
     .etag.mixed { background: #fef3c7; color: #92400e; border-color: #f59e0b; }
     .etag.foreign { background: #f3e8ff; color: #6b21a8; border-color: #a855f7; }
-    #loading-status { color: #5c5fef; font-weight: 600; margin-bottom: 10px; }
+    #loading-status { font-weight: 600; margin-bottom: 10px; color: #d97706; }
+    .ready { color: #16a34a !important; }
   </style>
 </head>
 <body>
@@ -36,17 +37,15 @@
   <h1>Subtitle Professional Spellchecker</h1>
   
   <div class="card">
-    <div id="loading-status">Loading Dictionary...</div>
-    <div class="upload-area" id="drop-zone" onclick="document.getElementById('file-input').click()">
+    <div id="loading-status">⏳ Downloading Dictionary...</div>
+    <div class="upload-area" onclick="document.getElementById('file-input').click()">
       <input type="file" id="file-input" accept=".xlsx,.xls">
       <div style="font-size: 30px;">📂</div>
       <p>Drop Excel file here or <strong>browse</strong></p>
       <div id="file-name" style="margin-top:10px; color:#5c5fef;"></div>
     </div>
-    
     <div style="margin-top: 1.5rem;">
-      <button class="btn btn-primary" id="run-btn" onclick="runChecks()" disabled>Run Spellcheck</button>
-      <span style="font-size: 12px; color: #666; margin-left: 10px;">Checks Column E (Index 4)</span>
+      <button class="btn btn-primary" id="run-btn" onclick="runChecks()" disabled>Run Full File Check</button>
     </div>
   </div>
 
@@ -54,9 +53,8 @@
     <div class="card">
       <div id="stats" style="margin-bottom:10px;"></div>
       <table>
-        <thead>
-          <tr><th>Row</th><th>Dialogue</th><th>Issues Found</th></tr>
-        </thead>
+        <colgroup><col style="width: 100px;"><col style="width: 300px;"><col style="width: auto;"></colgroup>
+        <thead><tr><th>Location</th><th>Text</th><th>Issues Found</th></tr></thead>
         <tbody id="results-body"></tbody>
       </table>
     </div>
@@ -67,27 +65,27 @@
 let typoChecker = null;
 let workbook = null;
 
-// Using a more reliable combined dictionary source
+// Improved Loader with local fallbacks if needed
 async function loadDictionary() {
   const status = document.getElementById('loading-status');
+  // Using stable jsDelivr links for the dictionaries
+  const affUrl = "https://cdn.jsdelivr.net/gh/wooorm/dictionaries/dictionaries/en-US/index.aff";
+  const dicUrl = "https://cdn.jsdelivr.net/gh/wooorm/dictionaries/dictionaries/en-US/index.dic";
+
   try {
-    const affUrl = "https://raw.githubusercontent.com/wooorm/dictionaries/main/dictionaries/en-US/index.aff";
-    const dicUrl = "https://raw.githubusercontent.com/wooorm/dictionaries/main/dictionaries/en-US/index.dic";
-
     const [affData, dicData] = await Promise.all([
-      fetch(affUrl).then(res => res.text()),
-      fetch(dicUrl).then(res => res.text())
+      fetch(affUrl).then(r => r.text()),
+      fetch(dicUrl).then(r => r.text())
     ]);
-
     typoChecker = new Typo("en_US", affData, dicData);
     status.innerHTML = "✅ Dictionary Ready";
-    console.log("Dictionary loaded successfully");
+    status.className = "ready";
+    console.log("Spellchecker initialized.");
   } catch (e) {
-    status.innerHTML = "❌ Error loading dictionary. Check internet connection.";
+    status.innerHTML = "❌ Dictionary Error. Please use GitHub Pages (HTTPS).";
     console.error(e);
   }
 }
-
 loadDictionary();
 
 const fileInput = document.getElementById('file-input');
@@ -97,86 +95,90 @@ fileInput.onchange = (e) => {
   document.getElementById('file-name').innerText = file.name;
   const reader = new FileReader();
   reader.onload = (event) => {
-    try {
-      workbook = XLSX.read(event.target.result, { type: 'array' });
-      document.getElementById('run-btn').disabled = false;
-      console.log("Excel loaded");
-    } catch (err) {
-      alert("Error reading Excel file.");
-    }
+    workbook = XLSX.read(event.target.result, { type: 'array' });
+    document.getElementById('run-btn').disabled = false;
   };
   reader.readAsArrayBuffer(file);
 };
 
+function getColName(n) {
+  let s = "";
+  while(n >= 0) {
+    s = String.fromCharCode(n % 26 + 65) + s;
+    n = Math.floor(n / 26) - 1;
+  }
+  return s;
+}
+
 function runChecks() {
-  if (!typoChecker) return alert("Dictionary is still downloading. Please wait.");
+  if (!typoChecker) return alert("Dictionary not ready. Wait for the green checkmark.");
   
   const sheet = workbook.Sheets[workbook.SheetNames[0]];
   const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
-  
-  // Note: Adjust slice(1) if your file doesn't have a header row
-  const data = rows.slice(1); 
   const resultsBody = document.getElementById('results-body');
   resultsBody.innerHTML = '';
   document.getElementById('results-area').style.display = 'block';
   
-  let errorCount = 0;
+  let issueCount = 0;
 
-  data.forEach((row, index) => {
-    // Check Column E (Index 4)
-    const text = String(row[4] || '').trim();
-    if (!text) return;
+  rows.forEach((row, rowIndex) => {
+    row.forEach((cellValue, colIndex) => {
+      const text = String(cellValue || '').trim();
+      if (!text || text.length < 2) return;
 
-    let issues = [];
+      let cellIssues = [];
 
-    // 1. Foreign Characters
-    const foreignMatches = text.match(/[^\x00-\x7F]+/g);
-    if (foreignMatches) {
-      foreignMatches.forEach(char => {
-        issues.push({type: 'foreign', val: `Non-English: ${char}`});
-      });
-    }
+      // 1. Foreign Character Check
+      const foreign = text.match(/[^\x00-\x7F\u2018\u2019\u201C\u201D\u2026]+/g);
+      if (foreign) {
+        foreign.forEach(char => cellIssues.push({type:'foreign', val: `Foreign: ${char}`}));
+      }
 
-    // 2. Spelling and Mixed Case
-    // We replace punctuation with spaces so we don't break words like "don't" (handled by Typo.js usually)
-    // but we strip basic symbols for clean checking.
-    const cleanWords = text.replace(/[0-9]/g, '').replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?"']/g, " ").split(/\s+/);
+      // 2. Formatting & Spell Check
+      // We strip punctuation but keep internal apostrophes for words like "don't"
+      const cleanWords = text.replace(/--/g, ' ') 
+                             .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?"“”]/g, " ") 
+                             .split(/\s+/);
 
-    cleanWords.forEach(word => {
-      if (word.length > 1) {
-        // Mixed Case Check
-        const isMixed = /[a-z][A-Z]/.test(word) || /^[A-Z]{2,}[a-z]/.test(word);
+      cleanWords.forEach(word => {
+        // Remove leading/trailing quotes or brackets from the word
+        const cleanWord = word.replace(/^['"\[\(]+|['"\]\)]+$/g, "");
         
-        // Spelling Check (all-caps handled as lowercase)
-        const isSpelledCorrectly = typoChecker.check(word.toLowerCase());
+        // Skip if word is a number or empty
+        if (cleanWord.length > 1 && !/^\d+$/.test(cleanWord)) {
+          
+          // Random Capitalization Check (Mixed Case)
+          const isMixed = /[a-z][A-Z]/.test(cleanWord) || /^[A-Z]{2,}[a-z]/.test(cleanWord);
+          
+          // Dictionary Check
+          const isSpelledCorrectly = typoChecker.check(cleanWord.toLowerCase());
 
-        if (isMixed) {
-          issues.push({type: 'mixed', val: `Mixed Case: ${word}`});
-        }
-        
-        if (!isSpelledCorrectly) {
-          if (!isMixed) {
-            issues.push({type: 'typo', val: `Typo: ${word}`});
+          if (isMixed) {
+            cellIssues.push({type:'mixed', val: `Mixed Case: ${cleanWord}`});
+          }
+          
+          if (!isSpelledCorrectly && !isMixed) {
+            cellIssues.push({type:'typo', val: `Typo: ${cleanWord}`});
           }
         }
+      });
+
+      if (cellIssues.length > 0) {
+        issueCount++;
+        const tr = document.createElement('tr');
+        tr.className = 'has-error';
+        const colLetter = getColName(colIndex);
+        tr.innerHTML = `
+          <td><strong>Row ${rowIndex + 1}</strong><br>Col ${colLetter}</td>
+          <td>${text}</td>
+          <td>${cellIssues.map(i => `<span class="etag ${i.type}">${i.val}</span>`).join('')}</td>
+        `;
+        resultsBody.appendChild(tr);
       }
     });
-
-    const tr = document.createElement('tr');
-    if (issues.length > 0) {
-      tr.className = 'has-error';
-      errorCount++;
-    }
-
-    tr.innerHTML = `
-      <td>${index + 2}</td>
-      <td>${text}</td>
-      <td>${issues.map(i => `<span class="etag ${i.type}">${i.val}</span>`).join('') || '<span style="color:green">✓</span>'}</td>
-    `;
-    resultsBody.appendChild(tr);
   });
 
-  document.getElementById('stats').innerHTML = `<strong>Checked ${data.length} rows. Found issues in ${errorCount}.</strong>`;
+  document.getElementById('stats').innerHTML = `<strong>Scan complete. Found ${issueCount} cells with potential errors.</strong>`;
 }
 </script>
 </body>
