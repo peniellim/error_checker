@@ -73,6 +73,8 @@
 <body>
 <div class="page">
   <h1>Subtitle Error Checker</h1>
+  <p class="subtitle-text">Upload an Excel subtitle file and select which checks to run.</p>
+
   <div class="card">
     <div class="card-title">File &amp; Settings</div>
     <div class="row">
@@ -88,16 +90,24 @@
         <div>
           <div style="font-size:13px;font-weight:500;margin-bottom:0.4rem;">Frame rate</div>
           <select id="fps-select">
-            <option value="25" selected>25 fps</option>
             <option value="23.976">23.976 fps</option>
             <option value="24">24 fps</option>
+            <option value="25" selected>25 fps</option>
             <option value="29.97">29.97 fps (drop)</option>
             <option value="30">30 fps</option>
+            <option value="50">50 fps</option>
+            <option value="59.94">59.94 fps</option>
+            <option value="60">60 fps</option>
           </select>
+        </div>
+        <div>
+          <div style="font-size:13px;font-weight:500;margin-bottom:0.4rem;">Sheet (tab name or number)</div>
+          <input id="sheet-input" type="text" placeholder="Leave blank for first sheet" style="padding:0.45rem 0.75rem;border:0.5px solid #ccc;border-radius:8px;font-size:14px;width:100%;">
         </div>
         <div>
           <div style="font-size:13px;font-weight:500;margin-bottom:0.4rem;">Header rows to skip</div>
           <input id="skip-rows" type="number" value="1" min="0" max="10" style="padding:0.45rem 0.75rem;border:0.5px solid #ccc;border-radius:8px;font-size:14px;width:80px;">
+          <p class="hint">Default: 1 row (row 1 = header)</p>
         </div>
       </div>
     </div>
@@ -127,6 +137,10 @@
           <option value="all">Show all rows</option>
           <option value="errors">Errors only</option>
         </select>
+        <label style="margin-left:0.5rem;">Error type:</label>
+        <select id="error-type-filter" onchange="applyFilter()">
+          <option value="all">All error types</option>
+        </select>
       </div>
       <div class="results-table-wrap">
         <table id="results-table">
@@ -134,10 +148,10 @@
             <tr>
               <th>#</th>
               <th>Row</th>
-              <th>Start</th>
-              <th>End</th>
-              <th>Dialogue</th>
-              <th>CPS</th>
+              <th>Start (B)</th>
+              <th>End (C)</th>
+              <th>Dialogue (E)</th>
+              <th>Read speed (Calc)</th>
               <th>Errors</th>
             </tr>
           </thead>
@@ -150,17 +164,28 @@
 
 <script>
 const CHECKS = [
-  { id:'emptyline', label:'Empty dialogue (Col E)', defaultOn:true },
   { id:'comma_detect', label:'Last line ends with comma', defaultOn:true },
-  { id:'char37', label:'Character limit: 37', defaultOn:true },
-  { id:'char42', label:'Character limit: 42', defaultOn:true },
   { id:'gap2', label:'Min 2-frame gap', defaultOn:true },
   { id:'overlap', label:'Subtitle Overlaps', defaultOn:true },
   { id:'mindur20', label:'Min duration 20 frames', defaultOn:true },
+  { id:'maxdur6s', label:'Max duration 6 seconds', defaultOn:true },
+  { id:'mindur1s', label:'Min duration 1 second', defaultOn:true },
+  { id:'maxdur8s', label:'Max duration of 8 seconds', defaultOn:true },
   { id:'curlya', label:"Curly apostrophe", defaultOn:true },
+  { id:'hypcon', label:'Hyphen for 2 speakers', defaultOn:true },
+  { id:'hyp_nospace', label:'No spacing after hyphen', defaultOn:true },
+  { id:'hyp_space', label:'Spacing after hyphen', defaultOn:true },
   { id:'multispc', label:'Multiple spaces', defaultOn:true },
+  { id:'emptyline', label:'Empty line', defaultOn:true },
   { id:'leadtrail', label:'Leading/trailing space', defaultOn:true },
+  { id:'doublehyp', label:'Double hyphens', defaultOn:true },
+  { id:'dotseq', label:'Invalid dots (not 1 or 3)', defaultOn:true },
+  { id:'char37', label:'Character limit: 37', defaultOn:true },
+  { id:'char42', label:'Character limit: 42', defaultOn:false },
   { id:'maxlines2', label:'Maximum 2 lines', defaultOn:true },
+  { id:'mergeable', label:'Fit to 1 line (Mergeable)', defaultOn:true },
+  { id:'end_punct', label:'Ending punctuation', defaultOn:true },
+  { id:'rs20', label:'Over 20 CPS', defaultOn:true },
   { id:'rs30', label:'Over 30 CPS', defaultOn:true },
 ];
 
@@ -169,6 +194,7 @@ window._tableData = [];
 
 function buildCheckboxes() {
   const grid = document.getElementById('checks-grid');
+  if (!grid) return;
   grid.innerHTML = '';
   CHECKS.forEach((c, i) => {
     const div = document.createElement('label');
@@ -180,25 +206,46 @@ function buildCheckboxes() {
   });
 }
 
-function toggleAll(on) { CHECKS.forEach(c => { document.getElementById('chk_'+c.id).checked = on; }); }
+function toggleAll(on) {
+  CHECKS.forEach(c => { document.getElementById('chk_'+c.id).checked = on; });
+}
+
 function isChecked(id) { return document.getElementById('chk_'+id)?.checked; }
-function stripTags(text) { return String(text||'').replace(/<\/?[^>]+(>|$)/g, ""); }
-function getLines(text) { return text ? String(text).split(/\r?\n/) : []; }
+function stripTags(text) { return text ? String(text).replace(/<\/?[^>]+(>|$)/g, "") : ""; }
 
 function tsToFrames(val, fps) {
-  if (!val) return null;
-  const parts = String(val).trim().split(':');
+  if (val == null || val === '') return null;
+  let str = String(val).trim();
+  const parts = str.split(':');
   if (parts.length < 4) return null;
-  const h=parseInt(parts[0])||0, m=parseInt(parts[1])||0, s=parseInt(parts[2])||0, f=parseInt(parts[3])||0;
+  const h = parseInt(parts[0])||0, m = parseInt(parts[1])||0, s = parseInt(parts[2])||0, f = parseInt(parts[3])||0;
   return Math.round((h*3600 + m*60 + s) * fps + f);
+}
+
+function framesToSec(frames, fps) { return frames / fps; }
+function getLines(text) { return text ? String(text).split(/\r?\n/) : []; }
+
+function setupDrop() {
+  const dz = document.getElementById('drop-zone');
+  const fi = document.getElementById('file-input');
+  dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
+  dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
+  dz.addEventListener('drop', e => { 
+    e.preventDefault(); 
+    dz.classList.remove('drag-over'); 
+    if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]); 
+  });
+  fi.addEventListener('change', () => { if (fi.files[0]) loadFile(fi.files[0]); });
 }
 
 function loadFile(file) {
   document.getElementById('file-name-display').textContent = file.name;
   const reader = new FileReader();
   reader.onload = e => {
-    workbook = XLSX.read(e.target.result, { type:'array', raw:false });
-    document.getElementById('run-btn').disabled = false;
+    try {
+      workbook = XLSX.read(e.target.result, { type:'array', raw:false });
+      document.getElementById('run-btn').disabled = false;
+    } catch (err) { alert("Error reading file."); }
   };
   reader.readAsArrayBuffer(file);
 }
@@ -206,94 +253,196 @@ function loadFile(file) {
 function runChecks() {
   if (!workbook) return;
   const fps = parseFloat(document.getElementById('fps-select').value);
+  const sheetInput = document.getElementById('sheet-input').value.trim();
   const skip = parseInt(document.getElementById('skip-rows').value)||1;
-  const sheet = workbook.Sheets[workbook.SheetNames[0]];
+
+  let sheetName = sheetInput || workbook.SheetNames[0];
+  let sheet = workbook.Sheets[sheetName];
+  if (!sheet) {
+    const idx = parseInt(sheetInput) - 1;
+    sheet = (!isNaN(idx) && workbook.SheetNames[idx]) ? workbook.Sheets[workbook.SheetNames[idx]] : workbook.Sheets[workbook.SheetNames[0]];
+  }
+
   const raw = XLSX.utils.sheet_to_json(sheet, { header:1, defval:'' });
   const rows = raw.slice(skip);
+
+  // Set character limit threshold
+  let activeLimit = 0;
+  if (isChecked('char37')) activeLimit = 37;
+  else if (isChecked('char42')) activeLimit = 42;
+
   const allErrorsSet = new Set();
 
   const processed = rows.map((row, idx) => {
-    const dialogue = row[4] != null ? String(row[4]) : '';
-    const startF = tsToFrames(row[1], fps);
-    const endF = tsToFrames(row[2], fps);
+    const startTs = row[1] != null ? String(row[1]).trim() : '';
+    const endTs   = row[2] != null ? String(row[2]).trim() : '';
+    const dialogue= row[4] != null ? String(row[4]) : '';
+    const startF  = tsToFrames(startTs, fps);
+    const endF    = tsToFrames(endTs, fps);
+    
     let rs = "";
-    if (startF!==null && endF!==null && endF>startF && dialogue.trim()!=='') {
-        rs = (stripTags(dialogue).replace(/\s+/g,'').length / ((endF-startF)/fps)).toFixed(1);
+    const durF = (startF != null && endF != null) ? (endF - startF) : null;
+    if (durF && durF > 0) {
+        const cleanText = stripTags(dialogue).replace(/\s+/g, '');
+        rs = (cleanText.length / framesToSec(durF, fps)).toFixed(1);
     }
-    return { rowNum:idx+skip+1, startTs:row[1], endTs:row[2], dialogue, rs, startF, endF, errors:[] };
+    return { rowNum: idx+skip+1, startTs, endTs, dialogue, rs, startF, endF, errors:[] };
   }).filter(r => r.startTs || r.endTs || r.dialogue);
 
   processed.forEach((r, i) => {
+    const errs = r.errors;
     const lines = getLines(r.dialogue);
-    
-    // Empty Line
-    if (isChecked('emptyline') && (!r.dialogue || r.dialogue.trim()==='')) {
-      r.errors.push('Empty dialogue'); allErrorsSet.add('Empty dialogue');
-    }
+    const durF = (r.startF != null && r.endF != null) ? (r.endF - r.startF) : null;
 
-    if (lines.length > 0 && r.dialogue.trim()!=='') {
-      // Comma Detect
-      if (isChecked('comma_detect') && lines[lines.length-1].trimEnd().endsWith(',')) {
-        r.errors.push('Ends with comma'); allErrorsSet.add('Trailing comma');
-      }
-
-      // SEPARATE CHARACTER LIMIT CHECKS
-      const maxLineLen = Math.max(...lines.map(l => stripTags(l).length));
-      
-      if (isChecked('char37') && maxLineLen > 37) {
-        r.errors.push(`Over 37ch (${maxLineLen})`); allErrorsSet.add('Char limit 37');
-      }
-      if (isChecked('char42') && maxLineLen > 42) {
-        r.errors.push(`Over 42ch (${maxLineLen})`); allErrorsSet.add('Char limit 42');
-      }
-
-      if (isChecked('curlya') && /[\u2018\u2019]/.test(r.dialogue)) { r.errors.push('Curly apostrophe'); allErrorsSet.add('Curly apostrophe'); }
-      if (isChecked('multispc') && /  +/.test(r.dialogue)) { r.errors.push('Multiple spaces'); allErrorsSet.add('Multiple spaces'); }
-      if (isChecked('leadtrail') && lines.some(l => l !== l.trim())) { r.errors.push('Lead/trail space'); allErrorsSet.add('Leading/trailing space'); }
-      if (isChecked('maxlines2') && lines.length > 2) { r.errors.push(`Lines: ${lines.length}`); allErrorsSet.add('Too many lines'); }
-    }
-
-    // Timing
     if (i < processed.length - 1) {
-      const gap = processed[i+1].startF - r.endF;
-      if (isChecked('overlap') && gap < 0) { r.errors.push('Overlap'); allErrorsSet.add('Overlap'); }
-      else if (isChecked('gap2') && gap >= 0 && gap < 2) { r.errors.push('Gap < 2f'); allErrorsSet.add('Gap < 2 frames'); }
+      const next = processed[i+1];
+      if (r.endF != null && next.startF != null) {
+        const gap = next.startF - r.endF;
+        if (isChecked('overlap') && gap < 0) { errs.push(`Overlap (${Math.abs(gap)}f)`); allErrorsSet.add('Overlap'); }
+        else if (isChecked('gap2') && gap >= 0 && gap < 2) { errs.push(`Gap < 2f (${gap}f)`); allErrorsSet.add('Gap < 2 frames'); }
+      }
     }
-    if (isChecked('mindur20') && (r.endF-r.startF) < 20) { r.errors.push('Short < 20f'); allErrorsSet.add('Duration < 20 frames'); }
-    if (isChecked('rs30') && parseFloat(r.rs) > 30) { r.errors.push('CPS > 30'); allErrorsSet.add('Reading speed > 30'); }
+
+    if (durF != null) {
+      const durS = framesToSec(durF, fps);
+      if (isChecked('mindur20') && durF < 20) { errs.push(`Short: < 20f`); allErrorsSet.add('Duration < 20 frames'); }
+      if (isChecked('mindur1s') && durS < 1) { errs.push(`Short: < 1s`); allErrorsSet.add('Duration < 1s'); }
+      if (isChecked('maxdur6s') && durS > 6) { errs.push(`Long: > 6s`); allErrorsSet.add('Duration > 6s'); }
+      if (isChecked('maxdur8s') && durS > 8) { errs.push(`Long: > 8s`); allErrorsSet.add('Duration > 8s'); }
+    }
+
+    if (isChecked('emptyline') && r.dialogue.trim() === '') { errs.push('Empty dialogue'); allErrorsSet.add('Empty dialogue'); }
+
+    if (lines.length > 0) {
+      const cleanDialogue = stripTags(r.dialogue).trim();
+
+      // Ending Punctuation Check
+      if (isChecked('end_punct')) {
+        const punctRegex = /[.!?"'」』\)\]\u201D\u2019]$/;
+        if (!punctRegex.test(cleanDialogue)) {
+          errs.push('No ending punctuation');
+          allErrorsSet.add('Missing ending punctuation');
+        }
+      }
+
+      // Character Limit Check
+      if (activeLimit > 0) {
+        const lineLengths = lines.map(l => stripTags(l).length);
+        const maxFound = Math.max(...lineLengths);
+        if (maxFound > activeLimit) {
+          errs.push(`Over limit: ${maxFound}ch`);
+          allErrorsSet.add(`Char limit ${activeLimit}`);
+        }
+      }
+
+      // Mergeable Check (Point 2)
+      if (isChecked('mergeable') && lines.length === 2 && activeLimit > 0) {
+        // Calculate length if merged: Line1 + Space + Line2
+        const totalMerged = stripTags(lines[0]).trim().length + stripTags(lines[1]).trim().length + 1;
+        if (totalMerged <= activeLimit) {
+          errs.push(`Mergeable (${totalMerged}ch)`);
+          allErrorsSet.add('Mergeable to 1 line');
+        }
+      }
+
+      if (isChecked('comma_detect')) {
+        const lastLine = lines[lines.length - 1]?.trimEnd() || "";
+        if (lastLine.endsWith(',')) { errs.push('Ends with comma'); allErrorsSet.add('Trailing comma'); }
+      }
+
+      if (isChecked('curlya') && /[\u2018\u2019\u201A\u201B]/.test(r.dialogue)) { errs.push("Curly apostrophe"); allErrorsSet.add("Curly apostrophe"); }
+      if (isChecked('doublehyp') && /--/.test(r.dialogue)) { errs.push('Double hyphens'); allErrorsSet.add('Double hyphens (--)'); }
+      
+      // Fixed Multiple Spaces Regex (2 or more)
+      if (isChecked('multispc') && / {2,}/.test(r.dialogue)) { errs.push('Multiple spaces'); allErrorsSet.add('Multiple spaces'); }
+      
+      if (isChecked('dotseq')) {
+        const dots = r.dialogue.match(/\.{2,}/g) || [];
+        const bad = dots.filter(s => s.length !== 3);
+        if (bad.length > 0) { errs.push(`Dots: ${bad.join(',')}`); allErrorsSet.add('Invalid dot sequence'); }
+      }
+      if (isChecked('hypcon') && lines.length === 2) {
+        const l1h = /^-/.test(lines[0].trim()), l2h = /^-/.test(lines[1].trim());
+        if (l1h !== l2h) { errs.push('Hyphen inconsistency'); allErrorsSet.add('Hyphen inconsistency'); }
+      }
+      if (isChecked('hyp_nospace') && lines.some(l => /^-\s/.test(l.trim()))) { errs.push('Space after hyphen'); allErrorsSet.add('Hyphen followed by space'); }
+      if (isChecked('hyp_space') && lines.some(l => /^-[^\s]/.test(l.trim()))) { errs.push('No space after hyphen'); allErrorsSet.add('Hyphen missing space after'); }
+      if (isChecked('leadtrail') && lines.some(l => l !== l.trim())) { errs.push('Lead/trail space'); allErrorsSet.add('Leading/trailing space'); }
+      if (isChecked('maxlines2') && lines.length > 2) { errs.push(`Lines: ${lines.length}`); allErrorsSet.add('Too many lines'); }
+    }
+
+    const rsv = parseFloat(r.rs);
+    if (!isNaN(rsv)) {
+      if (isChecked('rs20') && rsv > 20) { errs.push(`CPS > 20`); allErrorsSet.add('Reading speed > 20'); }
+      if (isChecked('rs30') && rsv > 30) { errs.push(`CPS > 30`); allErrorsSet.add('Reading speed > 30'); }
+    }
   });
 
-  window._tableData = processed;
-  renderResults(processed);
+  renderResults(processed, allErrorsSet);
 }
 
-function renderResults(data) {
-  document.getElementById('results-area').style.display = 'block';
+function renderResults(data, allErrorsSet) {
+  const area = document.getElementById('results-area');
+  area.style.display = 'block';
+  area.scrollIntoView({ behavior:'smooth', block:'start' });
+  const errorCount = data.filter(r=>r.errors.length>0).length;
+  const totalIssues = data.reduce((s,r)=>s+r.errors.length,0);
+
+  document.getElementById('stats-row').innerHTML = `
+    <div class="stat-box"><div class="val">${data.length}</div><div class="lbl">Total Subs</div></div>
+    <div class="stat-box ${errorCount>0?'err':'ok'}"><div class="val">${errorCount}</div><div class="lbl">Rows w/ Errors</div></div>
+    <div class="stat-box ${totalIssues>0?'warn':'ok'}"><div class="val">${totalIssues}</div><div class="lbl">Total Issues</div></div>
+  `;
+
+  const etf = document.getElementById('error-type-filter');
+  etf.innerHTML = '<option value="all">All error types</option>';
+  [...allErrorsSet].sort().forEach(e => {
+    const opt = document.createElement('option');
+    opt.value = e; opt.textContent = e;
+    etf.appendChild(opt);
+  });
+
+  window._tableData = data;
   applyFilter();
 }
 
 function applyFilter() {
   const filter = document.getElementById('filter-select').value;
+  const etFilter = document.getElementById('error-type-filter').value;
   const tbody = document.getElementById('results-body');
   tbody.innerHTML = '';
-  const visible = filter === 'errors' ? window._tableData.filter(r=>r.errors.length>0) : window._tableData;
+
+  let visible = window._tableData || [];
+  if (filter === 'errors') visible = visible.filter(r=>r.errors.length>0);
+  if (etFilter !== 'all') visible = visible.filter(r => r.errors.some(e => e.includes(etFilter) || e.toLowerCase().includes(etFilter.toLowerCase())));
+
+  if (visible.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7"><div class="no-errors"><div class="big">✓</div>No issues found!</div></td></tr>`;
+    return;
+  }
 
   visible.forEach((r, idx) => {
     const tr = document.createElement('tr');
     if (r.errors.length > 0) tr.classList.add('has-error');
-    tr.innerHTML = `<td>${idx+1}</td><td>${r.rowNum}</td><td>${r.startTs}</td><td>${r.endTs}</td>
-                    <td class="dialogue-cell">${getLines(r.dialogue).join('<br>')}</td><td>${r.rs}</td>
-                    <td><div class="error-tags">${r.errors.map(e=>`<span class="etag">${e}</span>`).join('')}</div></td>`;
+    const tags = r.errors.map(e=>`<span class="etag">${escHtml(e)}</span>`).join('');
+    tr.innerHTML = `
+      <td class="row-num">${idx+1}</td>
+      <td class="row-num">${r.rowNum}</td>
+      <td class="ts">${escHtml(r.startTs)}</td>
+      <td class="ts">${escHtml(r.endTs)}</td>
+      <td class="dialogue-cell">${getLines(r.dialogue).map(l => escHtml(l)).join('<br>')}</td>
+      <td class="rs">${escHtml(r.rs)}</td>
+      <td><div class="error-tags">${tags || '—'}</div></td>
+    `;
     tbody.appendChild(tr);
   });
 }
 
+function escHtml(str) { return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function resetAll() { location.reload(); }
-document.getElementById('file-input').addEventListener('change', e => loadFile(e.target.files[0]));
-document.getElementById('drop-zone').addEventListener('dragover', e => { e.preventDefault(); e.currentTarget.classList.add('drag-over'); });
-document.getElementById('drop-zone').addEventListener('dragleave', e => e.currentTarget.classList.remove('drag-over'));
-document.getElementById('drop-zone').addEventListener('drop', e => { e.preventDefault(); loadFile(e.dataTransfer.files[0]); });
+
 buildCheckboxes();
+setupDrop();
 </script>
 </body>
 </html>
