@@ -337,13 +337,20 @@ function runChecks() {
         }
       }
 
-      // Mergeable Check (Point 2)
+      // Updated Mergeable Check
       if (isChecked('mergeable') && lines.length === 2 && activeLimit > 0) {
-        // Calculate length if merged: Line1 + Space + Line2
-        const totalMerged = stripTags(lines[0]).trim().length + stripTags(lines[1]).trim().length + 1;
-        if (totalMerged <= activeLimit) {
-          errs.push(`Mergeable (${totalMerged}ch)`);
-          allErrorsSet.add('Mergeable to 1 line');
+        const line1Clean = stripTags(lines[0]).trim();
+        const line2Clean = stripTags(lines[1]).trim();
+  
+        // Check if it starts with a hyphen
+        const startsWithHyphen = line1Clean.startsWith('-');
+
+        if (!startsWithHyphen) {
+          const totalMerged = line1Clean.length + line2Clean.length + 1;
+          if (totalMerged <= activeLimit) {
+            errs.push(`Mergeable (${totalMerged}ch)`);
+            allErrorsSet.add('Mergeable to 1 line');
+          }
         }
       }
 
