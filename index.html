@@ -320,7 +320,7 @@ function runChecks() {
       // Ending Punctuation Check - IMPROVED REGEX
       if (isChecked('end_punct')) {
         // This looks for . , ? ! or ) followed by optional spaces until the end of the string
-        const validPunctRegex = /.,?!)]\s*$/";
+        const validPunctRegex = /.,?!)]\s*$/;
         if (!validPunctRegex.test(cleanDialogue)) {
           errs.push('No ending punctuation');
           allErrorsSet.add('Missing ending punctuation');
