@@ -22,12 +22,21 @@
   .upload-label strong { color: #5c5fef; cursor: pointer; }
   .file-name { margin-top: 0.75rem; font-size: 13px; color: #5c5fef; font-weight: 500; }
   select { padding: 0.45rem 0.75rem; border: 0.5px solid #ccc; border-radius: 8px; font-size: 14px; background: #fff; cursor: pointer; }
-  .checks-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(310px, 1fr)); gap: 0.5rem; }
-  .check-item { display: flex; align-items: flex-start; gap: 0.6rem; padding: 0.5rem 0.6rem; border-radius: 8px; cursor: pointer; transition: background 0.15s; user-select: none; }
+  
+  /* Group layout styles */
+  .groups-container { display: flex; flex-direction: column; gap: 1.5rem; margin-bottom: 1.5rem; }
+  .group-section { border-bottom: 1px dashed #eee; padding-bottom: 1rem; }
+  .group-section:last-child { border-bottom: none; padding-bottom: 0; }
+  .group-heading { font-size: 14px; font-weight: 700; color: #444; margin-bottom: 0.6rem; display: flex; align-items: center; gap: 0.5rem; }
+  .group-heading span { font-size: 11px; background: #e2e2db; padding: 1px 6px; border-radius: 10px; color: #555; }
+  .checks-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(310px, 1fr)); gap: 0.4rem; }
+  
+  .check-item { display: flex; align-items: flex-start; gap: 0.6rem; padding: 0.4rem 0.6rem; border-radius: 8px; cursor: pointer; transition: background 0.15s; user-select: none; }
   .check-item:hover { background: #f5f5f0; }
   .check-item input[type=checkbox] { margin-top: 3px; accent-color: #5c5fef; width: 15px; height: 15px; flex-shrink: 0; cursor: pointer; }
   .check-label { font-size: 13.5px; color: #333; line-height: 1.4; }
-  .check-num { font-size: 11px; font-weight: 600; color: #999; min-width: 18px; }
+  .empty-group-text { font-size: 13px; color: #999; font-style: italic; padding-left: 0.6rem; }
+  
   .btn { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.6rem 1.4rem; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; border: none; transition: opacity 0.15s, transform 0.1s; }
   .btn:active { transform: scale(0.98); }
   .btn-primary { background: #5c5fef; color: #fff; }
@@ -35,7 +44,7 @@
   .btn-primary:disabled { background: #bbb; cursor: not-allowed; }
   .btn-secondary { background: #f0f0f0; color: #444; border: 0.5px solid #ccc; }
   .btn-secondary:hover { background: #e8e8e8; }
-  .controls-row { display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; margin-top: 1rem; }
+  .controls-row { display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; margin-top: 1rem; border-top: 0.5px solid #ddd; padding-top: 1.25rem; }
   .stats-row { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 1rem; }
   .stat-box { background: #f5f5f0; border-radius: 8px; padding: 0.6rem 1rem; min-width: 120px; }
   .stat-box .val { font-size: 20px; font-weight: 600; }
@@ -114,14 +123,16 @@
   </div>
 
   <div class="card">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
       <div class="card-title" style="margin:0;">Checks to run</div>
       <div style="display:flex;gap:0.75rem;">
         <button class="toggle-all" onclick="toggleAll(true)">Select all</button>
         <button class="toggle-all" onclick="toggleAll(false)">Deselect all</button>
       </div>
     </div>
-    <div class="checks-grid" id="checks-grid"></div> 
+    
+    <div class="groups-container" id="groups-container"></div> 
+    
     <div class="controls-row">
       <button class="btn btn-primary" id="run-btn" onclick="runChecks()" disabled>Run checks</button>
       <button class="btn btn-secondary" onclick="resetAll()">Reset</button>
@@ -163,54 +174,114 @@
 </div>
 
 <script>
+const GROUPS = [
+  { key: 'General', label: 'General' },
+  { key: 'Coupang', label: 'Coupang' },
+  { key: 'WBD',     label: 'WBD' },
+  { key: 'PCCW',    label: 'PCCW' },
+  { key: 'CJENM',   label: 'CJENM' },
+  { key: 'Netflix', label: 'Netflix' }
+];
+
 const CHECKS = [
-  { id:'comma_detect', label:'Last line ends with comma', defaultOn:true },
-  { id:'gap2', label:'Min 2-frame gap', defaultOn:true },
-  { id:'overlap', label:'Subtitle Overlaps', defaultOn:true },
-  { id:'mindur20', label:'Min duration 20 frames', defaultOn:true },
-  { id:'maxdur6s', label:'Max duration 6 seconds', defaultOn:true },
-  { id:'mindur1s', label:'Min duration 1 second', defaultOn:true },
-  { id:'maxdur8s', label:'Max duration of 8 seconds', defaultOn:true },
-  { id:'curlya', label:"Curly apostrophe", defaultOn:true },
-  { id:'hypcon', label:'Hyphen for 2 speakers', defaultOn:true },
-  { id:'hyp_nospace', label:'No spacing after hyphen', defaultOn:true },
-  { id:'hyp_space', label:'Spacing after hyphen', defaultOn:true },
-  { id:'multispc', label:'Multiple spaces', defaultOn:true },
-  { id:'emptyline', label:'Empty line', defaultOn:true },
-  { id:'leadtrail', label:'Leading/trailing space', defaultOn:true },
-  { id:'doublehyp', label:'Double hyphens', defaultOn:true },
-  { id:'dotseq', label:'Invalid dots (not 1 or 3)', defaultOn:true },
-  { id:'char37', label:'Character limit: 37', defaultOn:true },
-  { id:'char42', label:'Character limit: 42', defaultOn:false },
-  { id:'maxlines2', label:'Maximum 2 lines', defaultOn:true },
-  { id:'mergeable', label:'Fit to 1 line (Mergeable)', defaultOn:true },
-  { id:'end_punct', label:'Ending punctuation', defaultOn:true },
-  { id:'rs20', label:'Over 20 CPS', defaultOn:true },
-  { id:'rs30', label:'Over 30 CPS', defaultOn:true },
+  // --- GROUP 1: GENERAL ---
+  { id: 'gen_gap2',       group: 'General', label: 'Min 2-frame gap', defaultOn: true },
+  { id: 'gen_overlap',    group: 'General', label: 'Subtitle Overlaps', defaultOn: true },
+  { id: 'gen_curlya',     group: 'General', label: 'Curly apostrophe', defaultOn: true },
+  { id: 'gen_multispc',   group: 'General', label: 'Multiple spaces', defaultOn: true },
+  { id: 'gen_emptyline',  group: 'General', label: 'Empty line', defaultOn: true },
+  { id: 'gen_leadtrail',  group: 'General', label: 'Leading/trailing space', defaultOn: true },
+  { id: 'gen_dotseq',     group: 'General', label: 'Invalid dots (not 1 or 3)', defaultOn: true },
+  { id: 'gen_mergeable',  group: 'General', label: 'Fit to 1 line (mergeable)', defaultOn: true },
+  { id: 'gen_maxlines2',  group: 'General', label: 'Maximum 2 lines', defaultOn: true },
+  { id: 'gen_hypcon',     group: 'General', label: 'Hyphen for 2 speakers', defaultOn: true },
+
+  // --- GROUP 2: COUPANG ---
+  { id: 'coup_mindur20',  group: 'Coupang', label: 'Min duration 20 frames', defaultOn: true },
+  { id: 'coup_maxdur6s',  group: 'Coupang', label: 'Max duration 6 seconds', defaultOn: true },
+  { id: 'coup_hyp_space', group: 'Coupang', label: 'Spacing after hyphen', defaultOn: true },
+  { id: 'coup_char42',    group: 'Coupang', label: 'Character limit: 42', defaultOn: true },
+  { id: 'coup_rs20',      group: 'Coupang', label: 'Over 20 CPS', defaultOn: true },
+  { id: 'coup_rs30',      group: 'Coupang', label: 'Over 30 CPS', defaultOn: true },
+
+  // --- GROUP 3: WBD ---
+  { id: 'wbd_mindur1s',   group: 'WBD',     label: 'Min duration 1 second', defaultOn: true },
+  { id: 'wbd_maxdur8s',   group: 'WBD',     label: 'Max duration of 8 seconds', defaultOn: true },
+  { id: 'wbd_hyp_space',  group: 'WBD',     label: 'Spacing after hyphen', defaultOn: true },
+  { id: 'wbd_comma_det',  group: 'WBD',     label: 'Last line ends with comma', defaultOn: true },
+  { id: 'wbd_doublehyp',  group: 'WBD',     label: 'Double hyphens', defaultOn: true },
+  { id: 'wbd_char37',     group: 'WBD',     label: 'Character limit: 37', defaultOn: true },
+  { id: 'wbd_rs30',       group: 'WBD',     label: 'Over 30 CPS', defaultOn: true },
+
+  // --- GROUP 4: PCCW ---
+  { id: 'pccw_mindur1s',  group: 'PCCW',    label: 'Min duration 1 second', defaultOn: true },
+  { id: 'pccw_maxdur6s',  group: 'PCCW',    label: 'Max duration 6 seconds', defaultOn: true },
+  { id: 'pccw_char75',    group: 'PCCW',    label: 'Character limit: 75', defaultOn: true },
+  { id: 'pccw_maxline1',  group: 'PCCW',    label: 'Maximum 1 line', defaultOn: true },
+  { id: 'pccw_noitalics', group: 'PCCW',    label: 'No italics', defaultOn: true },
+  { id: 'pccw_end_punct', group: 'PCCW',    label: 'Ending punctuation', defaultOn: true },
+
+  // --- GROUP 5: CJENM (Empty for now) ---
+
+  // --- GROUP 6: NETFLIX ---
+  { id: 'net_mindur1s',   group: 'Netflix', label: 'Min duration 1 second', defaultOn: true },
+  { id: 'net_maxdur8s',   group: 'Netflix', label: 'Max duration 8 seconds', defaultOn: true },
+  { id: 'net_hypcon',     group: 'Netflix', label: 'Hyphen for 2 speakers', defaultOn: true },
+  { id: 'net_hyp_nospace',group: 'Netflix', label: 'No spacing after hyphen', defaultOn: true },
+  { id: 'net_rs30',       group: 'Netflix', label: 'Over 30 CPS', defaultOn: true }
 ];
 
 let workbook = null;
 window._tableData = [];
 
 function buildCheckboxes() {
-  const grid = document.getElementById('checks-grid');
-  if (!grid) return;
-  grid.innerHTML = '';
-  CHECKS.forEach((c, i) => {
-    const div = document.createElement('label');
-    div.className = 'check-item';
-    div.innerHTML = `<input type="checkbox" id="chk_${c.id}" ${c.defaultOn?'checked':''}>
-                     <span class="check-num">${i+1}.</span>
-                     <span class="check-label">${c.label}</span>`;
-    grid.appendChild(div);
+  const container = document.getElementById('groups-container');
+  if (!container) return;
+  container.innerHTML = '';
+
+  GROUPS.forEach((g, gIdx) => {
+    const groupSection = document.createElement('div');
+    groupSection.className = 'group-section';
+
+    const heading = document.createElement('div');
+    heading.className = 'group-heading';
+    heading.innerHTML = `Group ${gIdx + 1}: ${g.label}`;
+    groupSection.appendChild(heading);
+
+    const groupChecks = CHECKS.filter(c => c.group === g.key);
+
+    if (groupChecks.length === 0) {
+      const emptyText = document.createElement('div');
+      emptyText.className = 'empty-group-text';
+      emptyText.textContent = '(None for now. To be updated soon)';
+      groupSection.appendChild(emptyText);
+    } else {
+      const grid = document.createElement('div');
+      grid.className = 'checks-grid';
+
+      groupChecks.forEach((c, cIdx) => {
+        const div = document.createElement('label');
+        div.className = 'check-item';
+        div.innerHTML = `<input type="checkbox" id="chk_${c.id}" ${c.defaultOn ? 'checked' : ''}>
+                         <span class="check-num">${cIdx + 1}.</span>
+                         <span class="check-label">${c.label}</span>`;
+        grid.appendChild(div);
+      });
+      groupSection.appendChild(grid);
+    }
+
+    container.appendChild(groupSection);
   });
 }
 
 function toggleAll(on) {
-  CHECKS.forEach(c => { document.getElementById('chk_'+c.id).checked = on; });
+  CHECKS.forEach(c => {
+    const el = document.getElementById('chk_' + c.id);
+    if (el) el.checked = on;
+  });
 }
 
-function isChecked(id) { return document.getElementById('chk_'+id)?.checked; }
+function isChecked(id) { return document.getElementById('chk_' + id)?.checked; }
 function stripTags(text) { return text ? String(text).replace(/<\/?[^>]+(>|$)/g, "") : ""; }
 
 function tsToFrames(val, fps) {
@@ -266,11 +337,6 @@ function runChecks() {
   const raw = XLSX.utils.sheet_to_json(sheet, { header:1, defval:'' });
   const rows = raw.slice(skip);
 
-  // Set character limit threshold
-  let activeLimit = 0;
-  if (isChecked('char37')) activeLimit = 37;
-  else if (isChecked('char42')) activeLimit = 42;
-
   const allErrorsSet = new Set();
 
   const processed = rows.map((row, idx) => {
@@ -293,97 +359,118 @@ function runChecks() {
     const errs = r.errors;
     const lines = getLines(r.dialogue);
     const durF = (r.startF != null && r.endF != null) ? (r.endF - r.startF) : null;
+    const durS = durF != null ? framesToSec(durF, fps) : null;
 
+    // --- TIMING / ROW RELATION CHECKS ---
     if (i < processed.length - 1) {
       const next = processed[i+1];
       if (r.endF != null && next.startF != null) {
         const gap = next.startF - r.endF;
-        if (isChecked('overlap') && gap < 0) { errs.push(`Overlap (${Math.abs(gap)}f)`); allErrorsSet.add('Overlap'); }
-        else if (isChecked('gap2') && gap >= 0 && gap < 2) { errs.push(`Gap < 2f (${gap}f)`); allErrorsSet.add('Gap < 2 frames'); }
+        if (isChecked('gen_overlap') && gap < 0) { errs.push(`Overlap (${Math.abs(gap)}f)`); allErrorsSet.add('Overlap'); }
+        else if (isChecked('gen_gap2') && gap >= 0 && gap < 2) { errs.push(`Gap < 2f (${gap}f)`); allErrorsSet.add('Gap < 2 frames'); }
       }
     }
 
-    if (durF != null) {
-      const durS = framesToSec(durF, fps);
-      if (isChecked('mindur20') && durF < 20) { errs.push(`Short: < 20f`); allErrorsSet.add('Duration < 20 frames'); }
-      if (isChecked('mindur1s') && durS < 1) { errs.push(`Short: < 1s`); allErrorsSet.add('Duration < 1s'); }
-      if (isChecked('maxdur6s') && durS > 6) { errs.push(`Long: > 6s`); allErrorsSet.add('Duration > 6s'); }
-      if (isChecked('maxdur8s') && durS > 8) { errs.push(`Long: > 8s`); allErrorsSet.add('Duration > 8s'); }
+    // --- DURATION CHECKS ---
+    if (durF != null && durS != null) {
+      if (isChecked('coup_mindur20') && durF < 20) { errs.push(`Coupang Short: < 20f`); allErrorsSet.add('Coupang Short (< 20f)'); }
+      if (isChecked('wbd_mindur1s') && durS < 1) { errs.push(`WBD Short: < 1s`); allErrorsSet.add('WBD Short (< 1s)'); }
+      if (isChecked('pccw_mindur1s') && durS < 1) { errs.push(`PCCW Short: < 1s`); allErrorsSet.add('PCCW Short (< 1s)'); }
+      if (isChecked('net_mindur1s') && durS < 1) { errs.push(`Netflix Short: < 1s`); allErrorsSet.add('Netflix Short (< 1s)'); }
+      
+      if (isChecked('coup_maxdur6s') && durS > 6) { errs.push(`Coupang Long: > 6s`); allErrorsSet.add('Coupang Long (> 6s)'); }
+      if (isChecked('pccw_maxdur6s') && durS > 6) { errs.push(`PCCW Long: > 6s`); allErrorsSet.add('PCCW Long (> 6s)'); }
+      if (isChecked('wbd_maxdur8s') && durS > 8) { errs.push(`WBD Long: > 8s`); allErrorsSet.add('WBD Long (> 8s)'); }
+      if (isChecked('net_maxdur8s') && durS > 8) { errs.push(`Netflix Long: > 8s`); allErrorsSet.add('Netflix Long (> 8s)'); }
     }
 
-    if (isChecked('emptyline') && r.dialogue.trim() === '') { errs.push('Empty dialogue'); allErrorsSet.add('Empty dialogue'); }
+    // --- DIALOGUE CHECKS ---
+    if (isChecked('gen_emptyline') && r.dialogue.trim() === '') { errs.push('Empty dialogue'); allErrorsSet.add('Empty dialogue'); }
 
     if (lines.length > 0) {
-      // Clean dialogue for punctuation check: remove tags and trim spaces/newlines
       const cleanDialogue = stripTags(r.dialogue).trim();
 
-      // Ending Punctuation Check - IMPROVED REGEX
-      if (isChecked('end_punct')) {
-        // This looks for . , ? ! or ) followed by optional spaces until the end of the string
-        const validPunctRegex = /[.,?!)]\s*$/;
-        if (!validPunctRegex.test(cleanDialogue)) {
-          errs.push('No ending punctuation');
-          allErrorsSet.add('Missing ending punctuation');
-        }
+      // General Text Formatting
+      if (isChecked('gen_curlya') && /[\u2018\u2019\u201A\u201B]/.test(r.dialogue)) { errs.push("Curly apostrophe"); allErrorsSet.add("Curly apostrophe"); }
+      if (isChecked('gen_multispc') && / {2,}/.test(r.dialogue)) { errs.push('Multiple spaces'); allErrorsSet.add('Multiple spaces'); }
+      if (isChecked('gen_leadtrail') && lines.some(l => l !== l.trim())) { errs.push('Lead/trail space'); allErrorsSet.add('Leading/trailing space'); }
+      if (isChecked('wbd_doublehyp') && /--/.test(r.dialogue)) { errs.push('WBD Double hyphens'); allErrorsSet.add('WBD Double hyphens (--)'); }
+      
+      if (isChecked('gen_dotseq')) {
+        const dots = r.dialogue.match(/\.{2,}/g) || [];
+        const bad = dots.filter(s => s.length !== 3);
+        if (bad.length > 0) { errs.push(`Dots: ${bad.join(',')}`); allErrorsSet.add('Invalid dot sequence'); }
       }
 
-      // Character Limit Check
-      if (activeLimit > 0) {
-        const lineLengths = lines.map(l => stripTags(l).length);
-        const maxFound = Math.max(...lineLengths);
-        if (maxFound > activeLimit) {
-          errs.push(`Over limit: ${maxFound}ch`);
-          allErrorsSet.add(`Char limit ${activeLimit}`);
-        }
+      // Line Limits
+      if (isChecked('gen_maxlines2') && lines.length > 2) { errs.push(`Lines: ${lines.length}`); allErrorsSet.add('Too many lines'); }
+      if (isChecked('pccw_maxline1') && lines.length > 1) { errs.push(`PCCW Lines: ${lines.length}`); allErrorsSet.add('PCCW Exceeded 1 line'); }
+
+      // Character Limits
+      if (isChecked('wbd_char37')) {
+        const maxFound = Math.max(...lines.map(l => stripTags(l).length));
+        if (maxFound > 37) { errs.push(`WBD Over limit: ${maxFound}ch`); allErrorsSet.add('WBD Char limit 37'); }
+      }
+      if (isChecked('coup_char42')) {
+        const maxFound = Math.max(...lines.map(l => stripTags(l).length));
+        if (maxFound > 42) { errs.push(`Coupang Over limit: ${maxFound}ch`); allErrorsSet.add('Coupang Char limit 42'); }
+      }
+      if (isChecked('pccw_char75')) {
+        const maxFound = Math.max(...lines.map(l => stripTags(l).length));
+        if (maxFound > 75) { errs.push(`PCCW Over limit: ${maxFound}ch`); allErrorsSet.add('PCCW Char limit 75'); }
       }
 
-      // Updated Mergeable Check
-      if (isChecked('mergeable') && lines.length === 2 && activeLimit > 0) {
+      // Mergeable Check
+      if (isChecked('gen_mergeable') && lines.length === 2) {
         const line1Clean = stripTags(lines[0]).trim();
         const line2Clean = stripTags(lines[1]).trim();
-  
-        // Check if it starts with a hyphen
-        const startsWithHyphen = line1Clean.startsWith('-');
-
-        if (!startsWithHyphen) {
+        if (!line1Clean.startsWith('-')) {
           const totalMerged = line1Clean.length + line2Clean.length + 1;
-          if (totalMerged <= activeLimit) {
+          // Dynamically check against whatever client limit is running or fall back to standard 37
+          const currentLimit = isChecked('coup_char42') ? 42 : (isChecked('pccw_char75') ? 75 : 37);
+          if (totalMerged <= currentLimit) {
             errs.push(`Mergeable (${totalMerged}ch)`);
             allErrorsSet.add('Mergeable to 1 line');
           }
         }
       }
 
-      if (isChecked('comma_detect')) {
-        const lastLine = lines[lines.length - 1]?.trimEnd() || "";
-        if (lastLine.endsWith(',')) { errs.push('Ends with comma'); allErrorsSet.add('Trailing comma'); }
-      }
-
-      if (isChecked('curlya') && /[\u2018\u2019\u201A\u201B]/.test(r.dialogue)) { errs.push("Curly apostrophe"); allErrorsSet.add("Curly apostrophe"); }
-      if (isChecked('doublehyp') && /--/.test(r.dialogue)) { errs.push('Double hyphens'); allErrorsSet.add('Double hyphens (--)'); }
-      
-      // Fixed Multiple Spaces Regex (2 or more)
-      if (isChecked('multispc') && / {2,}/.test(r.dialogue)) { errs.push('Multiple spaces'); allErrorsSet.add('Multiple spaces'); }
-      
-      if (isChecked('dotseq')) {
-        const dots = r.dialogue.match(/\.{2,}/g) || [];
-        const bad = dots.filter(s => s.length !== 3);
-        if (bad.length > 0) { errs.push(`Dots: ${bad.join(',')}`); allErrorsSet.add('Invalid dot sequence'); }
-      }
-      if (isChecked('hypcon') && lines.length === 2) {
+      // Hyphen Exchange Rules
+      if (isChecked('gen_hypcon') && lines.length === 2) {
         const l1h = /^-/.test(lines[0].trim()), l2h = /^-/.test(lines[1].trim());
         if (l1h !== l2h) { errs.push('Hyphen inconsistency'); allErrorsSet.add('Hyphen inconsistency'); }
       }
-      if (isChecked('hyp_nospace') && lines.some(l => /^-\s/.test(l.trim()))) { errs.push('Space after hyphen'); allErrorsSet.add('Hyphen followed by space'); }
-      if (isChecked('hyp_space') && lines.some(l => /^-[^\s]/.test(l.trim()))) { errs.push('No space after hyphen'); allErrorsSet.add('Hyphen missing space after'); }
-      if (isChecked('leadtrail') && lines.some(l => l !== l.trim())) { errs.push('Lead/trail space'); allErrorsSet.add('Leading/trailing space'); }
-      if (isChecked('maxlines2') && lines.length > 2) { errs.push(`Lines: ${lines.length}`); allErrorsSet.add('Too many lines'); }
+      if (isChecked('net_hypcon') && lines.length === 2) {
+        const l1h = /^-/.test(lines[0].trim()), l2h = /^-/.test(lines[1].trim());
+        if (l1h !== l2h) { errs.push('Netflix Hyphen inconsistency'); allErrorsSet.add('Netflix Hyphen inconsistency'); }
+      }
+      if (isChecked('coup_hyp_space') && lines.some(l => /^-[^\s]/.test(l.trim()))) { errs.push('Coupang Hyphen missing space'); allErrorsSet.add('Coupang Hyphen missing space'); }
+      if (isChecked('wbd_hyp_space') && lines.some(l => /^-[^\s]/.test(l.trim()))) { errs.push('WBD Hyphen missing space'); allErrorsSet.add('WBD Hyphen missing space'); }
+      if (isChecked('net_hyp_nospace') && lines.some(l => /^-\s/.test(l.trim()))) { errs.push('Netflix Space after hyphen'); allErrorsSet.add('Netflix Space after hyphen'); }
+
+      // Punctuation Mechanics
+      if (isChecked('wbd_comma_det')) {
+        const lastLine = lines[lines.length - 1]?.trimEnd() || "";
+        if (lastLine.endsWith(',')) { errs.push('WBD Ends with comma'); allErrorsSet.add('WBD Trailing comma'); }
+      }
+      if (isChecked('pccw_end_punct')) {
+        const validPunctRegex = /[.,?!\)]\s*$/;
+        if (!validPunctRegex.test(cleanDialogue)) { errs.push('PCCW No ending punctuation'); allErrorsSet.add('PCCW Missing punctuation'); }
+      }
+
+      // Style Mechanics
+      if (isChecked('pccw_noitalics') && /<i>|<\/i>/i.test(r.dialogue)) {
+        errs.push('PCCW Italics detected'); allErrorsSet.add('PCCW Italics forbidden');
+      }
     }
 
+    // --- READING SPEED (CPS) CHECKS ---
     const rsv = parseFloat(r.rs);
     if (!isNaN(rsv)) {
-      if (isChecked('rs20') && rsv > 20) { errs.push(`CPS > 20`); allErrorsSet.add('Reading speed > 20'); }
-      if (isChecked('rs30') && rsv > 30) { errs.push(`CPS > 30`); allErrorsSet.add('Reading speed > 30'); }
+      if (isChecked('coup_rs20') && rsv > 20) { errs.push(`Coupang CPS > 20`); allErrorsSet.add('Coupang CPS > 20'); }
+      if (isChecked('coup_rs30') && rsv > 30) { errs.push(`Coupang CPS > 30`); allErrorsSet.add('Coupang CPS > 30'); }
+      if (isChecked('wbd_rs30') && rsv > 30) { errs.push(`WBD CPS > 30`); allErrorsSet.add('WBD CPS > 30'); }
+      if (isChecked('net_rs30') && rsv > 30) { errs.push(`Netflix CPS > 30`); allErrorsSet.add('Netflix CPS > 30'); }
     }
   });
 
