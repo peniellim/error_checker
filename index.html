@@ -335,15 +335,38 @@ function runChecks() {
     sheet = (!isNaN(idx) && workbook.SheetNames[idx]) ? workbook.Sheets[workbook.SheetNames[idx]] : workbook.Sheets[workbook.SheetNames[0]];
   }
 
-  const raw = XLSX.utils.sheet_to_json(sheet, { header:1, defval:'' });
-  const rows = raw.slice(skip);
+  const range = XLSX.utils.decode_range(sheet['!ref']);
+  const processed = [];
 
-  const allErrorsSet = new Set();
+  for (let rIdx = range.s.r + skip; rIdx <= range.e.r; rIdx++) {
+    const cellStart    = sheet[XLSX.utils.encode_cell({r: rIdx, c: 1})];
+    const cellEnd      = sheet[XLSX.utils.encode_cell({r: rIdx, c: 2})];
+    const cellDialogue = sheet[XLSX.utils.encode_cell({r: rIdx, c: 4})];
 
-  const processed = rows.map((row, idx) => {
-    const startTs = row[1] != null ? String(row[1]).trim() : '';
-    const endTs   = row[2] != null ? String(row[2]).trim() : '';
-    const dialogue= row[4] != null ? String(row[4]) : '';
+    const startTs = cellStart && cellStart.v != null ? String(cellStart.v).trim() : '';
+    const endTs   = cellEnd && cellEnd.v != null ? String(cellEnd.v).trim() : '';
+    
+    let dialogue = '';
+    let hasItalics = false;
+
+    if (cellDialogue) {
+      if (cellDialogue.h) {
+        dialogue = cellDialogue.h;
+        if (/<i>|<\/i>|<em/i.test(dialogue)) {
+          hasItalics = true;
+        }
+      } 
+      else if (cellDialogue.r) {
+        dialogue = cellDialogue.r.map(part => part.t || '').join('');
+        hasItalics = cellDialogue.r.some(part => part.s && (part.s.italic || part.s.i));
+      } 
+      else {
+        dialogue = cellDialogue.v != null ? String(cellDialogue.v) : '';
+      }
+    }
+
+    if (!startTs && !endTs && !dialogue) continue;
+
     const startF  = tsToFrames(startTs, fps);
     const endF    = tsToFrames(endTs, fps);
     
@@ -353,8 +376,21 @@ function runChecks() {
         const cleanText = stripTags(dialogue).replace(/\s+/g, '');
         rs = (cleanText.length / framesToSec(durF, fps)).toFixed(1);
     }
-    return { rowNum: idx+skip+1, startTs, endTs, dialogue, rs, startF, endF, errors:[] };
-  }).filter(r => r.startTs || r.endTs || r.dialogue);
+
+    processed.push({ 
+      rowNum: rIdx + 1, 
+      startTs, 
+      endTs, 
+      dialogue, 
+      rs, 
+      startF, 
+      endF, 
+      hasItalics, 
+      errors: [] 
+    });
+  }
+
+  const allErrorsSet = new Set();
 
   processed.forEach((r, i) => {
     const errs = r.errors;
@@ -462,9 +498,10 @@ function runChecks() {
         if (!validPunctRegex.test(cleanDialogue)) { errs.push('PCCW No ending punctuation'); allErrorsSet.add('PCCW Missing punctuation'); }
       }
 
-      // Style Mechanics
-      if (isChecked('pccw_noitalics') && /<i>|<\/i>/i.test(r.dialogue)) {
-        errs.push('PCCW Italics detected'); allErrorsSet.add('PCCW Italics forbidden');
+      // STYLE MECHANICS
+      if (isChecked('pccw_noitalics') && (r.hasItalics || /<i>|<\/i>|<em/i.test(r.dialogue))) {
+        errs.push('PCCW Italics detected'); 
+        allErrorsSet.add('PCCW Italics forbidden');
       }
     }
 
