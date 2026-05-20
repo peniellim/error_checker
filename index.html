@@ -228,6 +228,7 @@ const CHECKS = [
   { id: 'net_maxdur8s',   group: 'Netflix', label: 'Max duration 8 seconds', defaultOn: true },
   { id: 'net_hypcon',     group: 'Netflix', label: 'Hyphen for 2 speakers', defaultOn: true },
   { id: 'net_hyp_nospace',group: 'Netflix', label: 'No spacing after hyphen', defaultOn: true },
+  { id: 'net_char42',     group: 'Netflix', label: 'Character limit: 42', defaultOn: true },
   { id: 'net_rs30',       group: 'Netflix', label: 'Over 30 CPS', defaultOn: true }
 ];
 
@@ -371,17 +372,17 @@ function runChecks() {
       }
     }
 
-    // --- DURATION CHECKS ---
+    // --- DURATION INCLUSIVE CHECKS ---
     if (durF != null && durS != null) {
       if (isChecked('coup_mindur20') && durF < 20) { errs.push(`Coupang Short: < 20f`); allErrorsSet.add('Coupang Short (< 20f)'); }
-      if (isChecked('wbd_mindur1s') && durS < 1) { errs.push(`WBD Short: < 1s`); allErrorsSet.add('WBD Short (< 1s)'); }
-      if (isChecked('pccw_mindur1s') && durS < 1) { errs.push(`PCCW Short: < 1s`); allErrorsSet.add('PCCW Short (< 1s)'); }
-      if (isChecked('net_mindur1s') && durS < 1) { errs.push(`Netflix Short: < 1s`); allErrorsSet.add('Netflix Short (< 1s)'); }
+      if (isChecked('wbd_mindur1s') && durS < 1.0) { errs.push(`WBD Short: < 1s`); allErrorsSet.add('WBD Short (< 1s)'); }
+      if (isChecked('pccw_mindur1s') && durS < 1.0) { errs.push(`PCCW Short: < 1s`); allErrorsSet.add('PCCW Short (< 1s)'); }
+      if (isChecked('net_mindur1s') && durS < 1.0) { errs.push(`Netflix Short: < 1s`); allErrorsSet.add('Netflix Short (< 1s)'); }
       
-      if (isChecked('coup_maxdur6s') && durS > 6) { errs.push(`Coupang Long: > 6s`); allErrorsSet.add('Coupang Long (> 6s)'); }
-      if (isChecked('pccw_maxdur6s') && durS > 6) { errs.push(`PCCW Long: > 6s`); allErrorsSet.add('PCCW Long (> 6s)'); }
-      if (isChecked('wbd_maxdur8s') && durS > 8) { errs.push(`WBD Long: > 8s`); allErrorsSet.add('WBD Long (> 8s)'); }
-      if (isChecked('net_maxdur8s') && durS > 8) { errs.push(`Netflix Long: > 8s`); allErrorsSet.add('Netflix Long (> 8s)'); }
+      if (isChecked('coup_maxdur6s') && durS > 6.0) { errs.push(`Coupang Long: > 6s`); allErrorsSet.add('Coupang Long (> 6s)'); }
+      if (isChecked('pccw_maxdur6s') && durS > 6.0) { errs.push(`PCCW Long: > 6s`); allErrorsSet.add('PCCW Long (> 6s)'); }
+      if (isChecked('wbd_maxdur8s') && durS > 8.0) { errs.push(`WBD Long: > 8s`); allErrorsSet.add('WBD Long (> 8s)'); }
+      if (isChecked('net_maxdur8s') && durS > 8.0) { errs.push(`Netflix Long: > 8s`); allErrorsSet.add('Netflix Long (> 8s)'); }
     }
 
     // --- DIALOGUE CHECKS ---
@@ -415,6 +416,10 @@ function runChecks() {
         const maxFound = Math.max(...lines.map(l => stripTags(l).length));
         if (maxFound > 42) { errs.push(`Coupang Over limit: ${maxFound}ch`); allErrorsSet.add('Coupang Char limit 42'); }
       }
+      if (isChecked('net_char42')) {
+        const maxFound = Math.max(...lines.map(l => stripTags(l).length));
+        if (maxFound > 42) { errs.push(`Netflix Over limit: ${maxFound}ch`); allErrorsSet.add('Netflix Char limit 42'); }
+      }
       if (isChecked('pccw_char75')) {
         const maxFound = Math.max(...lines.map(l => stripTags(l).length));
         if (maxFound > 75) { errs.push(`PCCW Over limit: ${maxFound}ch`); allErrorsSet.add('PCCW Char limit 75'); }
@@ -426,8 +431,7 @@ function runChecks() {
         const line2Clean = stripTags(lines[1]).trim();
         if (!line1Clean.startsWith('-')) {
           const totalMerged = line1Clean.length + line2Clean.length + 1;
-          // Dynamically check against whatever client limit is running or fall back to standard 37
-          const currentLimit = isChecked('coup_char42') ? 42 : (isChecked('pccw_char75') ? 75 : 37);
+          const currentLimit = isChecked('coup_char42') || isChecked('net_char42') ? 42 : (isChecked('pccw_char75') ? 75 : 37);
           if (totalMerged <= currentLimit) {
             errs.push(`Mergeable (${totalMerged}ch)`);
             allErrorsSet.add('Mergeable to 1 line');
